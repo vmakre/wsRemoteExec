@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,21 +51,24 @@ func pumpStdin(ws *websocket.Conn, w io.Writer) {
 		if err != nil {
 			break
 		}
-		// parse new lines
-		// Handle both Windows and Unix newlines
-		normalizedS := strings.ReplaceAll(string(message), "\r\n", "\n")
-		lines := strings.Split(normalizedS, "\n")
-		var cmd string
-		// If the message starts with "Cmd:", execute it as a command
-		if len(lines) > 0 && strings.HasPrefix(lines[0], "Cmd:") {
-			cmd = strings.TrimPrefix(lines[0], "Cmd:")
-			cmd = strings.TrimSpace(cmd)
-			if cmd == "" {
-				continue
-			}
+		if !strings.HasPrefix(string(message), "\"Cmd:") {
+			continue
 		}
+		// Using strconv.Unquote for escaped JSON strings
+		// This is useful if the message is a JSON string that needs to be unquoted
+		mess := string(message)
+		unquoted, err := strconv.Unquote(mess)
+		if err != nil {
+			fmt.Println("Error unquoting:", err)
+			return
+		}
+		unquoted = strings.TrimPrefix(unquoted, "Cmd: ")
+		// fmt.Println("Error unquoting:", unquoted)
+		lines := strings.Split(unquoted, "\n")
+		var cmd string
+
 		log.Printf("Executing command: %s", cmd)
-		for _, line := range strings.Split(cmd, "\n") {
+		for _, line := range lines {
 			if _, err := w.Write([]byte(line + "\n")); err != nil {
 				break
 			}
@@ -158,23 +162,20 @@ func main() {
 		defer close(done)
 		for {
 			// Read messages from the WebSocket connection.
-			_, message, err := c.ReadMessage()
-
-			if err != nil {
-				log.Println("read:", err)
-				return
-			}
-			log.Println("command:", message)
+			// _, message, err := c.ReadMessage()
+			// if err != nil {
+			// 	log.Println("read:", err)
+			// 	return
+			// }
+			// log.Println("command:", message)
 			stdoutDone := make(chan struct{})
 			go pumpStdout(c, stdout, stdoutDone)
-
 			// Start a goroutine to ping the server periodically.
 			go ping(c, stdoutDone)
-
 			pumpStdin(c, stdin)
 			// Some commands will exit when stdin is closed.
 			stdin.Close()
-			log.Printf("recv: %s", message)
+			// log.Printf("recv: %s", message)
 		}
 	}()
 
