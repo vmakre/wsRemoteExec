@@ -4,14 +4,21 @@
 
 package main
 
+import "sync"
+
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
+	// Hub ID is a unique identifier for the hub.
+	ID string
 	// Registered clients.
 	clients map[*Client]bool
 
 	// Inbound messages from the clients.
 	broadcast chan []byte
+
+	// Mutex to protect access to the clients map.
+	mu sync.Mutex
 
 	// Register requests from the clients.
 	register chan *Client
@@ -20,8 +27,9 @@ type Hub struct {
 	unregister chan *Client
 }
 
-func newHub() *Hub {
+func newHub(id string) *Hub {
 	return &Hub{
+		ID:         id,
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),

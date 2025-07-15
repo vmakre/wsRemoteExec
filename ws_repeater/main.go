@@ -24,11 +24,19 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	}
 	http.ServeFile(w, r, "home.html")
 }
+func createHub(hubName string) *Hub {
+
+	hub := newHub(hubName)
+	go hub.run()
+	return hub
+}
 
 func main() {
 	flag.Parse()
-	hub := newHub()
-	go hub.run()
+	// hub := newHub()
+	// go hub.run()
+	hub := createHub("default")
+
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
